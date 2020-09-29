@@ -1,0 +1,14 @@
+{
+  "xAxisField": "",
+  "yAxisField": "",
+  "metricField": "",
+  "useStats": false,
+  "statsType": "",
+  "useWhereClause": false,
+  "whereClause": "",
+  "useYAxisFieldLabel": false,
+  "yAxisFieldLabel": "",
+  "numClasses": 4,
+  "selectedColorRamp": "",
+  "availableColorRamps": []
+}

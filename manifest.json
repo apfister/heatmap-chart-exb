@@ -1,0 +1,22 @@
+{
+  "name": "heatmap-chart",
+  "type": "widget",
+  "version": "1.1.0",
+  "exbVersion": "1.1.0",
+  "author": "Adam Pfister",
+  "description": "Make a heatmap chart",
+  "copyright": "",
+  "dependency": [
+    "jimu-arcgis"
+  ],
+  "license": "http://www.apache.org/licenses/LICENSE-2.0",
+  "properties": {},
+  "translatedLocales": [
+    "en",
+    "es"
+  ],
+  "defaultSize": {
+    "width": 800,
+    "height": 500
+  }
+}

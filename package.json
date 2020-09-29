@@ -1,0 +1,23 @@
+{
+  "name": "heatmap-chart",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Adam Pfister",
+  "license": "ISC",
+  "dependencies": {
+    "apexcharts": "^3.21.0",
+    "react-apexcharts": "^1.3.7"
+  },
+  "devDependencies": {
+    "eslint-config-prettier": "^6.10.1",
+    "eslint-config-react-app": "^5.2.1",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-prettier": "^3.1.3",
+    "eslint-plugin-react": "^7.19.0",
+    "prettier": "^2.0.4"
+  }
+}
