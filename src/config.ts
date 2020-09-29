@@ -1,4 +1,5 @@
 import { ImmutableObject } from 'seamless-immutable';
+// import { UseDataSource } from 'jimu-core';
 
 export interface Config {
   xAxisField: string;
@@ -13,6 +14,10 @@ export interface Config {
   numClasses: number;
   selectedColorRamp: string;
   availableColorRamps: Array<any>;
+  chartOptions: object;
+  seriesData: Array<any>;
+  chartTitle: string;
+  useDataLabels: boolean;
 }
 
 export type IMConfig = ImmutableObject<Config>;

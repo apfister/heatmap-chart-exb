@@ -49,7 +49,13 @@ export default class Setting extends React.PureComponent<
 
   constructor(props) {
     super(props);
+
     this.state = {
+      selectedDataSource:
+        this.props &&
+        this.props.useDataSources &&
+        this.props.useDataSources.length > 0 &&
+        this.props.useDataSources[0],
       checkProps: [
         'xAxisField',
         'yAxisField',
@@ -63,271 +69,182 @@ export default class Setting extends React.PureComponent<
         'numClasses',
         'selectedColorRamp',
         'availableColorRamps'
-      ]
+      ],
+      chartProps: ['useDataLabels']
     };
   }
 
-  componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>) {
-    // if (this.props.config.useWhereClause !== prevProps.config.useWhereClause) {
-    //   console.log('go query!!');
-    // } else {
-    //   console.log("don't query!!");
+  componentDidMount() {
+    // const baseChartOptions = {
+    //   chart: {
+    //     type: 'heatmap',
+    //     toolbar: {
+    //       show: true,
+    //       tools: {
+    //         download: true,
+    //         selection: true,
+    //         zoom: true,
+    //         zoomin: false,
+    //         zoomout: false,
+    //         pan: false,
+    //         reset: false
+    //       },
+    //       width: '100%'
+    //     },
+    //     events: {
+    //       selection: function (chartContext, { xaxis, yaxis }) {
+    //         console.log('selection', chartContext, { xaxis, yaxis });
+    //       },
+    //       click: function (chartContext, { xaxis, yaxis }) {
+    //         console.log('click', chartContext, { xaxis, yaxis });
+    //       },
+    //       dataPointSelection: function (event, chartContext, config) {
+    //         console.log('dataPointSelection', event, chartContext, config);
+    //       }
+    //     }
+    //   },
+    //   plotOptions: {
+    //     heatmap: {
+    //       shadeIntensity: 0.1,
+    //       useFillColorAsStroke: false,
+    //       radius: 0,
+    //       colorScale: {
+    //         ranges: []
+    //       }
+    //     }
+    //   },
+    //   dataLabels: { enabled: true, style: { colors: ['#104c6d'] } },
+    //   xaxis: {
+    //     labels: {
+    //       show: true,
+    //       rotate: -45,
+    //       rotateAlways: true,
+    //       trim: true,
+    //       maxHeight: 120,
+    //       // datetimeFormatter: {
+    //       //   year: 'yyyy',
+    //       //   month: 'MMM \'yy',
+    //       //   day: 'dd MMM',
+    //       //   hour: 'HH:mm'
+    //       // },
+    //       // tickPlacement: "between",
+    //       // formatter: (value, timestamp, index) => {
+    //       //   // console.log('formatter',timestamp, parseInt(value));
+    //       //   return this.formatDataItemKey(value);
+    //       // },
+    //       style: {
+    //         colors: [],
+    //         fontSize: '12px',
+    //         cssClass: 'apexcharts-xaxis-label'
+    //       },
+    //       offsetX: 0,
+    //       offsetY: 0
+    //     }
+    //   },
+    //   selection: {
+    //     enabled: true
+    //   }
+    // };
+    // if (
+    //   !this.props.config.chartOptions ||
+    //   !this.props.config.chartOptions.chart
+    // ) {
+    //   console.log("no config found for 'chartOptions'. setting default");
+    //   const config = {
+    //     id: this.props.id,
+    //     config: this.props.config.set('chartOptions', baseChartOptions)
+    //   };
+    //   this.props.onSettingChange(config);
     // }
+  }
 
-    const props = this.state.checkProps;
+  componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>) {
+    // we may not need this check.
+    // it could be that we will always want to re-run the query
+    let props = this.state.checkProps;
     for (let i = 0; i < props.length; i++) {
-      if (this.props.config[props[i]] !== prevProps.config[props[i]]) {
-        console.log('found a break! re-query!');
+      if (
+        this.props.config[props[i]] !== prevProps.config[props[i]] &&
+        this.isDsConfigured()
+      ) {
+        console.log(
+          'ds is configured and there is a prop change. time to re-query!'
+        );
+
+        // re-run query
+        this.query();
         break;
       }
     }
 
-    // if (this.props.useDataSourcesEnabled !== prevProps.useDataSourcesEnabled) {
-    //   const checked = this.props.useDataSourcesEnabled;
+    // props = this.state.chartProps;
+    // for (let i = 0; i < props.length; i++) {
+    //   if (
+    //     this.props.config[props[i]] !== prevProps.config[props[i]] &&
+    //     this.isDsConfigured()
+    //   ) {
+    //     console.log(
+    //       'ds is configured and there is a prop change. time to update the chart props'
+    //     );
 
-    //   let functionConfig = Immutable(this.props.config.functionConfig);
+    //     const propName = props[i];
+    //     const propValue = this.props.config[props[i]];
+    //     let currentChartConfig = this.props.config.chartOptions;
+    //     if (propName === 'useDataLabels') {
+    //       currentChartConfig.dataLabels.enabled = propValue;
+    //     }
 
-    //   if (checked) {
-    //     if (
-    //       this.props.config.functionConfig.imgSourceType ===
-    //       ImgSourceType.ByStaticUrl
-    //     ) {
-    //       functionConfig = functionConfig.set(
-    //         'imgSourceType',
-    //         ImgSourceType.ByDynamicUrl
-    //       );
-    //     }
-    //   } else {
-    //     if (
-    //       this.props.config.functionConfig.imgSourceType ===
-    //       ImgSourceType.ByDynamicUrl
-    //     ) {
-    //       functionConfig = functionConfig.set(
-    //         'imgSourceType',
-    //         ImgSourceType.ByStaticUrl
-    //       );
-    //     }
+    //     const config = {
+    //       id: this.props.id,
+    //       config: this.props.config.set('chartOptions', currentChartConfig)
+    //     };
+
+    //     this.props.onSettingChange(config);
+    //     break;
     //   }
-
-    //   this.props.onSettingChange({
-    //     id: this.props.id,
-    //     config: this.props.config.set('functionConfig', functionConfig)
-    //   });
     // }
   }
 
-  // onFieldChange = (allSelectedFields: IMFieldSchema[]) => {
-  //   this.props.onSettingChange({
-  //     id: this.props.id,
-  //     useDataSources: [
-  //       {
-  //         ...this.props.useDataSources[0],
-  //         ...{ fields: allSelectedFields.map((f) => f.jimuName) }
-  //       }
-  //     ]
-  //   });
-  // };
-
-  onXAxisFieldChange = (allSelectedFields: IMFieldSchema[]) => {
+  updateDataLabels(use) {
+    let currentChartConfig = this.props.config.chartOptions;
+    currentChartConfig.dataLabels.enabled = use;
     const config = {
       id: this.props.id,
-      config: this.props.config.set('xAxisField', allSelectedFields[0].jimuName)
+      config: this.props.config.set('chartOptions', currentChartConfig)
     };
     this.props.onSettingChange(config);
-  };
+  }
 
-  onYAxisFieldChange = (allSelectedFields: IMFieldSchema[]) => {
+  onPropChange = (propKey: string, propValue: any) => {
     const config = {
       id: this.props.id,
-      config: this.props.config.set('yAxisField', allSelectedFields[0].jimuName)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onMetricFieldChange = (allSelectedFields: IMFieldSchema[]) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set(
-        'metricField',
-        allSelectedFields[0].jimuName
-      )
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onUseStatsChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    checked: boolean
-  ) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('useStats', checked)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onToggleUseDataEnabled = (useDataSourcesEnabled: boolean) => {
-    this.props.onSettingChange({
-      id: this.props.id,
-      useDataSourcesEnabled
-    });
-  };
-
-  onStatsTypeChange = (evt: any, item?: React.Element<DropdownItemProps>) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('statsType', evt.target.value)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onUseWhereChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    checked: boolean
-  ) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('useWhereClause', checked)
+      config: this.props.config.set(propKey, propValue)
     };
     // save to config file
     this.props.onSettingChange(config);
-    // update state
-    // this.setState({ useWhereClause: checked }, this.query);
   };
 
-  handleWhereClauseChange = (value: string) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('whereClause', value)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onUseYAxisFieldLabelChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    checked: boolean
-  ) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('useYAxisFieldLabel', checked)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onYAxisFieldLabelChange = (allSelectedFields: IMFieldSchema[]) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set(
-        'yAxisFieldLabel',
-        allSelectedFields[0].jimuName
-      )
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onDataSourceChange = (useDataSources: UseDataSource[]) => {
-    this.props.onSettingChange({
-      id: this.props.id,
-      useDataSources: useDataSources
-    });
-  };
-
-  onNumClassesChange = (value: number) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('numClasses', value)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  onColorRampChange = (evt: any, item?: React.Element<DropdownItemProps>) => {
-    const config = {
-      id: this.props.id,
-      config: this.props.config.set('selectedColorRamp', evt.target.value)
-    };
-    this.props.onSettingChange(config);
-  };
-
-  // START -- FROM widget.tsx
   isDsConfigured = () => {
-    console.log('isDsConfigured ===>');
+    // console.log('isDsConfigured ===>');
     if (
       this.props.useDataSources &&
       this.props.useDataSources?.length === 1 &&
       this.props.config.xAxisField &&
       this.props.config.yAxisField
     ) {
-      console.log('configured!');
-      const dId = this.props.useDataSources[0].dataSourceId;
-      const ds = DataSourceManager.getInstance().getDataSource(dId);
-      let label = ds.getLabel();
-      if (ds.parentDataSource) {
-        const parentLabel = ds.parentDataSource.getLabel();
-        label = `${parentLabel} - ${label}`;
-      }
-      this.setState({ chartLabel: label });
+      console.log('ds IS configured!');
+      // const dId = this.props.useDataSources[0].dataSourceId;
+      // const ds = DataSourceManager.getInstance().getDataSource(dId);
+      // let label = ds.getLabel();
+      // if (ds.parentDataSource) {
+      //   const parentLabel = ds.parentDataSource.getLabel();
+      //   label = `${parentLabel} - ${label}`;
+      // }
+      // this.setState({ chartLabel: label });
       return true;
     }
-    console.log('NOT configured!');
+    console.log('ds IS NOT configured!');
     return false;
-  };
-
-  query = () => {
-    // if (!this.isDsConfigured()) {
-    //   return;
-    // }
-
-    let where = '1=1';
-    if (this.props.config.useWhereClause) {
-      where = this.props.config.whereClause;
-    }
-
-    const orderByFields = [`${this.props.config.yAxisField} ASC`];
-
-    let query = {
-      where,
-      orderByFields
-    };
-
-    if (this.props.config.useStats) {
-      const outStatistics = [
-        {
-          statisticType: this.props.config.statsType,
-          onStatisticField: this.props.config.metricField,
-          outStatisticFieldName: `${this.props.config.statsType}_${this.props.config.metricField}`
-        }
-      ];
-      let groupByFieldsForStatistics = [
-        this.props.config.xAxisField,
-        this.props.config.yAxisField
-      ];
-      if (
-        this.props.config.useYAxisFieldLabel &&
-        this.props.config.yAxisFieldLabel &&
-        this.props.config.yAxisFieldLabel !== ''
-      ) {
-        groupByFieldsForStatistics.push(this.props.config.yAxisFieldLabel);
-      }
-      query['outStatistics'] = outStatistics;
-      query['groupByFieldsForStatistics'] = groupByFieldsForStatistics;
-    } else {
-      query['outFields'] = [
-        this.props.config.xAxisField,
-        this.props.config.yAxisField
-      ];
-
-      if (
-        this.props.config.useYAxisFieldLabel &&
-        this.props.config.yAxisFieldLabel &&
-        this.props.config.yAxisFieldLabel !== ''
-      ) {
-        query['outFields'].push(this.props.config.yAxisFieldLabel);
-      }
-    }
-
-    console.log('query', query);
-
-    this.setState({ query });
   };
 
   formatDataItemKey(invalue) {
@@ -400,6 +317,64 @@ export default class Setting extends React.PureComponent<
     });
   }
 
+  query = () => {
+    // if (!this.isDsConfigured()) {
+    //   return;
+    // }
+
+    let where = '1=1';
+    if (this.props.config.useWhereClause) {
+      where = this.props.config.whereClause;
+    }
+
+    const orderByFields = [`${this.props.config.yAxisField} ASC`];
+
+    let query = {
+      where,
+      orderByFields
+    };
+
+    if (this.props.config.useStats) {
+      const outStatistics = [
+        {
+          statisticType: this.props.config.statsType,
+          onStatisticField: this.props.config.metricField,
+          outStatisticFieldName: `${this.props.config.statsType}_${this.props.config.metricField}`
+        }
+      ];
+      let groupByFieldsForStatistics = [
+        this.props.config.xAxisField,
+        this.props.config.yAxisField
+      ];
+      if (
+        this.props.config.useYAxisFieldLabel &&
+        this.props.config.yAxisFieldLabel &&
+        this.props.config.yAxisFieldLabel !== ''
+      ) {
+        groupByFieldsForStatistics.push(this.props.config.yAxisFieldLabel);
+      }
+      query['outStatistics'] = outStatistics;
+      query['groupByFieldsForStatistics'] = groupByFieldsForStatistics;
+    } else {
+      query['outFields'] = [
+        this.props.config.xAxisField,
+        this.props.config.yAxisField
+      ];
+
+      if (
+        this.props.config.useYAxisFieldLabel &&
+        this.props.config.yAxisFieldLabel &&
+        this.props.config.yAxisFieldLabel !== ''
+      ) {
+        query['outFields'].push(this.props.config.yAxisFieldLabel);
+      }
+    }
+
+    console.log('query', query);
+
+    this.setState({ query });
+  };
+
   chartRender = (ds: DataSource, info: IMDataSourceInfo) => {
     if (ds && ds.getStatus() === DataSourceStatus.Loaded) {
       let records = ds.getRecords();
@@ -438,7 +413,7 @@ export default class Setting extends React.PureComponent<
 
       return null;
     }
-    return <div>unable to query</div>;
+    return null;
   };
 
   handleDataSourceCreated = (ds: DataSource) => {
@@ -454,9 +429,19 @@ export default class Setting extends React.PureComponent<
               types={this.supportedTypes}
               useDataSources={this.props.useDataSources}
               useDataSourcesEnabled={this.props.useDataSourcesEnabled}
-              onToggleUseDataEnabled={this.onToggleUseDataEnabled}
-              onChange={this.onDataSourceChange}
               widgetId={this.props.id}
+              onToggleUseDataEnabled={(useDataSourcesEnabled: boolean) => {
+                this.props.onSettingChange({
+                  id: this.props.id,
+                  useDataSourcesEnabled
+                });
+              }}
+              onChange={(useDataSources: UseDataSource[]) => {
+                this.props.onSettingChange({
+                  id: this.props.id,
+                  useDataSources: useDataSources
+                });
+              }}
             />
           </SettingRow>
         </SettingSection>
@@ -465,14 +450,30 @@ export default class Setting extends React.PureComponent<
           this.props.useDataSources &&
           this.props.useDataSources.length > 0 && (
             <>
+              {/* Chart Title */}
+              <SettingSection title="Chart Title">
+                <SettingRow>
+                  <TextInput
+                    value={this.props.config.chartTitle}
+                    onAcceptValue={(value: string) =>
+                      this.onPropChange('chartTitle', value)
+                    }
+                  />
+                </SettingRow>
+              </SettingSection>
+
+              {/* Where Clause */}
               <SettingSection title="Subset Data">
                 <Label className="mt-4 w-75 d-inline-block font-dark-600">
                   Use Where Clause
                   <Switch
                     aria-label="test"
                     className="ml-2"
-                    onChange={this.onUseWhereChange}
                     checked={this.props.config.useWhereClause}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLInputElement>,
+                      checked: boolean
+                    ) => this.onPropChange('useWhereClause', checked)}
                   />
                 </Label>
                 {!!this.props.config.useWhereClause && (
@@ -481,8 +482,10 @@ export default class Setting extends React.PureComponent<
                       Where Clause
                       <TextInput
                         placeholder="1=1"
-                        onAcceptValue={this.handleWhereClauseChange}
                         value={this.props.config.whereClause}
+                        onAcceptValue={(value: string) =>
+                          this.onPropChange('whereClause', value)
+                        }
                       />
                     </Label>
                   </SettingRow>
@@ -494,8 +497,13 @@ export default class Setting extends React.PureComponent<
                   <FieldSelector
                     useDropdown={true}
                     useDataSources={this.props.useDataSources}
-                    onChange={this.onMetricFieldChange}
                     selectedFields={Immutable([this.props.config.metricField])}
+                    onChange={(allSelectedFields: IMFieldSchema[]) =>
+                      this.onPropChange(
+                        'metricField',
+                        allSelectedFields[0].jimuName
+                      )
+                    }
                   />
                 </SettingRow>
                 <Label className="mt-4 w-75 d-inline-block font-dark-600">
@@ -503,8 +511,11 @@ export default class Setting extends React.PureComponent<
                   <Switch
                     aria-label="test"
                     className="ml-2"
-                    onChange={this.onUseStatsChange}
                     checked={this.props.config.useStats}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLInputElement>,
+                      checked: boolean
+                    ) => this.onPropChange('useStats', checked)}
                   />
                 </Label>
                 {!!this.props.config.useStats && (
@@ -513,7 +524,9 @@ export default class Setting extends React.PureComponent<
                       Statistic Type
                       <Select
                         value={this.props.config.statsType}
-                        onChange={this.onStatsTypeChange}
+                        onChange={(evt: any) =>
+                          this.onPropChange('statsType', evt.target.value)
+                        }
                       >
                         <Option value="sum">SUM</Option>
                         <Option value="cnt">COUNT</Option>
@@ -531,8 +544,13 @@ export default class Setting extends React.PureComponent<
                   <FieldSelector
                     useDropdown={true}
                     useDataSources={this.props.useDataSources}
-                    onChange={this.onYAxisFieldChange}
                     selectedFields={Immutable([this.props.config.yAxisField])}
+                    onChange={(allSelectedFields: IMFieldSchema[]) =>
+                      this.onPropChange(
+                        'yAxisField',
+                        allSelectedFields[0].jimuName
+                      )
+                    }
                   />
                 </SettingRow>
                 <Label className="mt-4 w-75 d-inline-block font-dark-600">
@@ -540,8 +558,11 @@ export default class Setting extends React.PureComponent<
                   <Switch
                     aria-label="test"
                     className="ml-2"
-                    onChange={this.onUseYAxisFieldLabelChange}
                     checked={this.props.config.useYAxisFieldLabel}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLInputElement>,
+                      checked: boolean
+                    ) => this.onPropChange('useYAxisFieldLabel', checked)}
                   />
                 </Label>
 
@@ -550,10 +571,15 @@ export default class Setting extends React.PureComponent<
                     <FieldSelector
                       useDropdown={true}
                       useDataSources={this.props.useDataSources}
-                      onChange={this.onYAxisFieldLabelChange}
                       selectedFields={Immutable([
                         this.props.config.yAxisFieldLabel
                       ])}
+                      onChange={(allSelectedFields: IMFieldSchema[]) =>
+                        this.onPropChange(
+                          'yAxisFieldLabel',
+                          allSelectedFields[0].jimuName
+                        )
+                      }
                     />
                   </SettingRow>
                 )}
@@ -564,8 +590,13 @@ export default class Setting extends React.PureComponent<
                   <FieldSelector
                     useDropdown={true}
                     useDataSources={this.props.useDataSources}
-                    onChange={this.onXAxisFieldChange}
                     selectedFields={Immutable([this.props.config.xAxisField])}
+                    onChange={(allSelectedFields: IMFieldSchema[]) =>
+                      this.onPropChange(
+                        'xAxisField',
+                        allSelectedFields[0].jimuName
+                      )
+                    }
                   />
                 </SettingRow>
               </SettingSection>
@@ -575,9 +606,10 @@ export default class Setting extends React.PureComponent<
                   <Label className="mt-4 w-75 d-inline-block font-dark-600">
                     Number of Classes
                     <NumericInput
-                      size="lg"
-                      onChange={this.onNumClassesChange}
                       value={this.props.config.numClasses}
+                      onChange={(value: number) =>
+                        this.onPropChange('numClasses', value)
+                      }
                     />
                   </Label>
                 </SettingRow>
@@ -586,7 +618,7 @@ export default class Setting extends React.PureComponent<
                     Color Ramp
                     <Select
                       value={this.props.config.selectedColorRamp}
-                      onChange={this.onColorRampChange}
+                      // onChange={this.onColorRampChange}
                     >
                       {/* {this.state.availableColorRamps &&
                         this.state.availableColorRamps.map((ramp) => (
@@ -595,10 +627,26 @@ export default class Setting extends React.PureComponent<
                     </Select>
                   </Label>
                 </SettingRow>
+                <SettingRow>
+                  <Label className="mt-4 w-75 d-inline-block font-dark-600">
+                    Use Data Labels
+                    <Switch
+                      aria-label="test"
+                      className="ml-2"
+                      checked={this.props.config.useDataLabels}
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>,
+                        checked: boolean
+                      ) => {
+                        this.onPropChange('useDataLabels', checked);
+                      }}
+                    />
+                  </Label>
+                </SettingRow>
               </SettingSection>
               <DataSourceComponent
                 useDataSource={this.props.useDataSources[0]}
-                query={this.state && this.state.query && this.state.query}
+                query={this.state.query && this.state.query}
                 widgetId={this.props.id}
                 queryCount
                 onDataSourceCreated={this.handleDataSourceCreated}
