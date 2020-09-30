@@ -14,5 +14,6 @@
   "chartOptions": {},
   "seriesData": [],
   "chartTitle": "",
-  "useDataLabels": false
+  "useDataLabels": false,
+  "colorRanges": []
 }

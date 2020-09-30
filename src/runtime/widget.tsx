@@ -1,17 +1,6 @@
-import {
-  React,
-  AllWidgetProps,
-  AllWidgetSettingProps,
-  IMDataSourceInfo,
-  DataSource,
-  DataSourceStatus,
-  DataSourceComponent
-  // DataSourceManager,
-  // FeatureLayerQueryParams,
-} from 'jimu-core';
+import { React, AllWidgetProps, AllWidgetSettingProps } from 'jimu-core';
 
 import Chart from 'react-apexcharts';
-// import FeatureLayer = require('esri/layers/FeatureLayer');
 import { IMConfig } from '../config';
 
 interface State {
@@ -29,6 +18,9 @@ export default class Widget extends React.PureComponent<
     super(props);
     this.state = {
       chartOptions: {
+        noData: {
+          text: 'No records returned'
+        },
         chart: {
           type: 'heatmap',
           toolbar: {
@@ -81,10 +73,10 @@ export default class Widget extends React.PureComponent<
         xaxis: {
           labels: {
             show: true,
-            rotate: -45,
-            rotateAlways: true,
-            trim: true,
-            maxHeight: 120,
+            // rotate: -45,
+            // rotateAlways: true,
+            trim: false,
+            // maxHeight: 120,
             // datetimeFormatter: {
             //   year: 'yyyy',
             //   month: 'MMM \'yy',
@@ -103,6 +95,13 @@ export default class Widget extends React.PureComponent<
             },
             offsetX: 0,
             offsetY: 0
+          },
+          type: 'datetime',
+          datetimeFormatter: {
+            year: 'yyyy',
+            month: "MMM 'yy",
+            day: 'dd MMM',
+            hour: 'HH:mm'
           }
         },
         selection: {
@@ -123,6 +122,23 @@ export default class Widget extends React.PureComponent<
           dataLabels: {
             ...prevState.chartOptions.dataLabels,
             enabled: this.props.config.useDataLabels
+          }
+        }
+      }));
+    }
+    if (this.props.config.colorRanges !== prevProps.config.colorRanges) {
+      this.setState((prevState) => ({
+        chartOptions: {
+          ...prevState.chartOptions,
+          plotOptions: {
+            ...prevState.chartOptions.plotOptions,
+            heatmap: {
+              ...prevState.chartOptions.plotOptions.heatmap,
+              colorScale: {
+                ...prevState.chartOptions.plotOptions.heatmap.colorScale,
+                ranges: this.props.config.colorRanges
+              }
+            }
           }
         }
       }));
@@ -154,7 +170,7 @@ export default class Widget extends React.PureComponent<
             <p>not properly configured. please select a datasource</p>
           </div>
         )}
-        {console.log('this.props.config in the render!', this.props.config)}
+        {/* {console.log('this.props.config in the render!', this.props.config)} */}
       </div>
     );
   }

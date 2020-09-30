@@ -18,6 +18,7 @@ export interface Config {
   seriesData: Array<any>;
   chartTitle: string;
   useDataLabels: boolean;
+  colorRanges: Array<any>;
 }
 
 export type IMConfig = ImmutableObject<Config>;

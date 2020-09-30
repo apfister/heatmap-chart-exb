@@ -5,14 +5,11 @@ import {
   UseDataSource,
   IMDataSourceInfo,
   DataSource,
-  DataSourceManager,
   DataSourceStatus,
-  FeatureLayerQueryParams,
-  AllWidgetProps,
   DataSourceComponent
 } from 'jimu-core';
 import { AllWidgetSettingProps } from 'jimu-for-builder';
-import { ArcGISDataSourceTypes } from 'jimu-arcgis';
+import { ArcGISDataSourceTypes, loadArcGISJSAPIModules } from 'jimu-arcgis';
 import {
   DataSourceSelector,
   FieldSelector
@@ -27,14 +24,32 @@ import {
   Label,
   Select,
   Option,
-  DropdownItemProps,
   TextInput,
   NumericInput
 } from 'jimu-ui';
 
 import { IMConfig } from '../config';
 
-import FeatureLayer = require('esri/layers/FeatureLayer');
+// import FeatureLayer = require('esri/layers/FeatureLayer');
+// import colorRendererCreator = require('esri/smartMapping/renderers/color');
+// import colorSchemes = require('esri/smartMapping/symbology/color');
+
+// class PreviewRamp extends React.Component {
+//   render(props) {
+//     return (
+//       <div style={{ display: 'flex' }}>
+//         {this.props.colors.map((color, i) => {
+//           return (
+//             <div
+//               key={`${color.id}-${i}`}
+//               style={{ backgroundColor: color.toHex(), height: 20, width: 20 }}
+//             ></div>
+//           );
+//         })}
+//       </div>
+//     );
+//   }
+// }
 
 interface IState {
   query: any;
@@ -46,11 +61,15 @@ export default class Setting extends React.PureComponent<
 > {
   supportedTypes = Immutable([ArcGISDataSourceTypes.FeatureLayer]);
   props: any;
+  // FeatureLayer: typeof __esri.FeatureLayer;
+  // colorRendererCreator: typeof __esri.smartMapping.renderers.color;
+  // colorSchemes: typeof __esri.smartMapping.symbology.color;
 
   constructor(props) {
     super(props);
 
     this.state = {
+      apiLoaded: false,
       selectedDataSource:
         this.props &&
         this.props.useDataSources &&
@@ -67,95 +86,53 @@ export default class Setting extends React.PureComponent<
         'useYAxisFieldLabel',
         'yAxisFieldLabel',
         'numClasses',
-        'selectedColorRamp',
-        'availableColorRamps'
+        'selectedColorRamp'
       ],
-      chartProps: ['useDataLabels']
+      chartProps: ['useDataLabels'],
+      aggFeatureLayer: null
     };
+
+    // if (!this.FeatureLayer) {
+    //   console.log('loading JS API modules...');
+    //   loadArcGISJSAPIModules([
+    //     'esri/layers/FeatureLayer',
+    //     'esri/smartMapping/renderers/color',
+    //     'esri/smartMapping/symbology/color'
+    //   ]).then((modules) => {
+    //     [
+    //       this.FeatureLayer,
+    //       this.colorRendererCreator,
+    //       this.colorSchemes
+    //     ] = modules;
+    //   });
+    // }
   }
 
   componentDidMount() {
-    // const baseChartOptions = {
-    //   chart: {
-    //     type: 'heatmap',
-    //     toolbar: {
-    //       show: true,
-    //       tools: {
-    //         download: true,
-    //         selection: true,
-    //         zoom: true,
-    //         zoomin: false,
-    //         zoomout: false,
-    //         pan: false,
-    //         reset: false
-    //       },
-    //       width: '100%'
-    //     },
-    //     events: {
-    //       selection: function (chartContext, { xaxis, yaxis }) {
-    //         console.log('selection', chartContext, { xaxis, yaxis });
-    //       },
-    //       click: function (chartContext, { xaxis, yaxis }) {
-    //         console.log('click', chartContext, { xaxis, yaxis });
-    //       },
-    //       dataPointSelection: function (event, chartContext, config) {
-    //         console.log('dataPointSelection', event, chartContext, config);
-    //       }
-    //     }
-    //   },
-    //   plotOptions: {
-    //     heatmap: {
-    //       shadeIntensity: 0.1,
-    //       useFillColorAsStroke: false,
-    //       radius: 0,
-    //       colorScale: {
-    //         ranges: []
-    //       }
-    //     }
-    //   },
-    //   dataLabels: { enabled: true, style: { colors: ['#104c6d'] } },
-    //   xaxis: {
-    //     labels: {
-    //       show: true,
-    //       rotate: -45,
-    //       rotateAlways: true,
-    //       trim: true,
-    //       maxHeight: 120,
-    //       // datetimeFormatter: {
-    //       //   year: 'yyyy',
-    //       //   month: 'MMM \'yy',
-    //       //   day: 'dd MMM',
-    //       //   hour: 'HH:mm'
-    //       // },
-    //       // tickPlacement: "between",
-    //       // formatter: (value, timestamp, index) => {
-    //       //   // console.log('formatter',timestamp, parseInt(value));
-    //       //   return this.formatDataItemKey(value);
-    //       // },
-    //       style: {
-    //         colors: [],
-    //         fontSize: '12px',
-    //         cssClass: 'apexcharts-xaxis-label'
-    //       },
-    //       offsetX: 0,
-    //       offsetY: 0
-    //     }
-    //   },
-    //   selection: {
-    //     enabled: true
-    //   }
-    // };
-    // if (
-    //   !this.props.config.chartOptions ||
-    //   !this.props.config.chartOptions.chart
-    // ) {
-    //   console.log("no config found for 'chartOptions'. setting default");
-    //   const config = {
-    //     id: this.props.id,
-    //     config: this.props.config.set('chartOptions', baseChartOptions)
-    //   };
-    //   this.props.onSettingChange(config);
-    // }
+    if (!this.state.apiLoaded) {
+      console.log('loading JS API modules...');
+      loadArcGISJSAPIModules([
+        'esri/layers/FeatureLayer',
+        'esri/smartMapping/renderers/color',
+        'esri/smartMapping/symbology/color'
+      ]).then((modules) => {
+        [
+          this.FeatureLayer,
+          this.colorRendererCreator,
+          this.colorSchemes
+        ] = modules;
+        this.setState({ apiLoaded: true }, () => {
+          if (this.isDsConfigured()) {
+            this.query();
+          }
+        });
+      });
+    } else {
+      console.log('JS API modules loaded');
+      if (this.isDsConfigured()) {
+        this.query();
+      }
+    }
   }
 
   componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>) {
@@ -177,32 +154,7 @@ export default class Setting extends React.PureComponent<
       }
     }
 
-    // props = this.state.chartProps;
-    // for (let i = 0; i < props.length; i++) {
-    //   if (
-    //     this.props.config[props[i]] !== prevProps.config[props[i]] &&
-    //     this.isDsConfigured()
-    //   ) {
-    //     console.log(
-    //       'ds is configured and there is a prop change. time to update the chart props'
-    //     );
-
-    //     const propName = props[i];
-    //     const propValue = this.props.config[props[i]];
-    //     let currentChartConfig = this.props.config.chartOptions;
-    //     if (propName === 'useDataLabels') {
-    //       currentChartConfig.dataLabels.enabled = propValue;
-    //     }
-
-    //     const config = {
-    //       id: this.props.id,
-    //       config: this.props.config.set('chartOptions', currentChartConfig)
-    //     };
-
-    //     this.props.onSettingChange(config);
-    //     break;
-    //   }
-    // }
+    console.log('componentDidUpdate :: configured??', this.isDsConfigured());
   }
 
   updateDataLabels(use) {
@@ -225,7 +177,6 @@ export default class Setting extends React.PureComponent<
   };
 
   isDsConfigured = () => {
-    // console.log('isDsConfigured ===>');
     if (
       this.props.useDataSources &&
       this.props.useDataSources?.length === 1 &&
@@ -233,14 +184,6 @@ export default class Setting extends React.PureComponent<
       this.props.config.yAxisField
     ) {
       console.log('ds IS configured!');
-      // const dId = this.props.useDataSources[0].dataSourceId;
-      // const ds = DataSourceManager.getInstance().getDataSource(dId);
-      // let label = ds.getLabel();
-      // if (ds.parentDataSource) {
-      //   const parentLabel = ds.parentDataSource.getLabel();
-      //   label = `${parentLabel} - ${label}`;
-      // }
-      // this.setState({ chartLabel: label });
       return true;
     }
     console.log('ds IS NOT configured!');
@@ -275,8 +218,10 @@ export default class Setting extends React.PureComponent<
       name: pivoted[key].label,
       data: pivoted[key].data.map((dataItem) => {
         const dataItemKey = Object.keys(dataItem)[0];
+        // console.log(dataItemKey, Date.parse(dataItemKey));
         return {
-          x: this.formatDataItemKey(parseInt(dataItemKey, 0)),
+          // x: this.formatDataItemKey(parseInt(dataItemKey, 0)),
+          x: parseInt(dataItemKey),
           y: dataItem[dataItemKey]
         };
       })
@@ -321,6 +266,8 @@ export default class Setting extends React.PureComponent<
     // if (!this.isDsConfigured()) {
     //   return;
     // }
+
+    console.log('query!!!');
 
     let where = '1=1';
     if (this.props.config.useWhereClause) {
@@ -375,9 +322,21 @@ export default class Setting extends React.PureComponent<
     this.setState({ query });
   };
 
+  updateSeriesData = (seriesData: Array<any>) => {
+    const config = {
+      id: this.props.id,
+      config: this.props.config.set('seriesData', seriesData)
+    };
+    this.props.onSettingChange(config);
+  };
+
   chartRender = (ds: DataSource, info: IMDataSourceInfo) => {
     if (ds && ds.getStatus() === DataSourceStatus.Loaded) {
       let records = ds.getRecords();
+      if (records.length === 0) {
+        this.updateSeriesData([]);
+        return null;
+      }
 
       const features = this.convertRecordsToFeatures(records);
       const formattedFields: Array<Object> = Object.keys(
@@ -405,16 +364,99 @@ export default class Setting extends React.PureComponent<
         yAxisFieldLabel
       );
 
-      const config = {
-        id: this.props.id,
-        config: this.props.config.set('seriesData', seriesData)
-      };
-      this.props.onSettingChange(config);
+      seriesData.sort((a, b) => b.name.localeCompare(a.name));
+      // console.log(seriesData);
+
+      this.updateSeriesData(seriesData);
+
+      // reset renderer
+      const url = `${ds.layer.url}/${ds.layer.layerId}`;
+      const fl = new this.FeatureLayer({ url });
+      console.log('feature layer!', url);
+
+      fl.queryFeatures(this.state.query).then((response) => {
+        response.features.forEach((feature, i) => {
+          feature.attributes['OBJECTID'] = i + 1;
+        });
+        response.fields.push({ name: 'OBJECTID', type: 'oid' });
+
+        const createdFL = new this.FeatureLayer({
+          source: response.features,
+          fields: response.fields,
+          spatialReference: 4326,
+          objectIdField: 'OBJECTID',
+          geometryType: response.geometryType
+        });
+
+        const schemes = this.colorSchemes
+          .getSchemesByTag({
+            geometryType: response.geometryType,
+            theme: 'high-to-low',
+            includedTags: ['sequential', 'oranges', 'reds']
+          })
+          .sort((a, b) => {
+            return a.name < b.name ? 1 : -1;
+          });
+
+        const config = {
+          id: this.props.id,
+          config: this.props.config.set('availableColorRamps', schemes)
+        };
+        this.props.onSettingChange(config);
+
+        this.updateRenderer(createdFL);
+      });
 
       return null;
     }
     return null;
   };
+
+  getColorScheme(csName) {
+    return this.props.config.availableColorRamps.filter(
+      (s) => s.name === csName
+    )[0];
+  }
+
+  updateRenderer(layer) {
+    const xAxisAgg = `${this.props.config.statsType}_${this.props.config.metricField}`;
+
+    let params = {
+      layer: layer,
+      field: xAxisAgg,
+      // classificationMethod: 'standard-deviation',
+      numClasses: this.props.config.numClasses
+    };
+
+    if (this.props.config.selectedColorRamp) {
+      params.colorScheme = this.getColorScheme(
+        this.props.config.selectedColorRamp
+      );
+    }
+
+    this.colorRendererCreator
+      .createClassBreaksRenderer(params)
+      .then((response) => {
+        const cbInfos = response.renderer.classBreakInfos;
+
+        let colors = cbInfos.map((i) => i.symbol.color.toHex());
+        // if (this.state.flipColors) {
+        //   colors = colors.reverse();
+        // }
+        const colorRanges = cbInfos.map((info, i) => ({
+          name: info.label,
+          from: info.minValue,
+          to: info.maxValue,
+          color: colors[i]
+        }));
+
+        const config = {
+          id: this.props.id,
+          config: this.props.config.set('colorRanges', colorRanges)
+        };
+        this.props.onSettingChange(config);
+      });
+  }
 
   handleDataSourceCreated = (ds: DataSource) => {
     this.setState({ selectedDataSource: ds });
@@ -492,6 +534,7 @@ export default class Setting extends React.PureComponent<
                 )}
               </SettingSection>
 
+              {/* Select Metric */}
               <SettingSection title="Select Metric to Chart">
                 <SettingRow>
                   <FieldSelector
@@ -528,11 +571,12 @@ export default class Setting extends React.PureComponent<
                           this.onPropChange('statsType', evt.target.value)
                         }
                       >
-                        <Option value="sum">SUM</Option>
-                        <Option value="cnt">COUNT</Option>
-                        <Option value="max">MAX</Option>
-                        <Option value="min">MIN</Option>
-                        <Option value="avg">AVG</Option>
+                        <Option value="sum">Sum</Option>
+                        <Option value="count">Count</Option>
+                        <Option value="max">Max</Option>
+                        <Option value="min">Min</Option>
+                        <Option value="avg">Average</Option>
+                        <Option value="stddev">Standard Deviation</Option>
                       </Select>
                     </Label>
                   </SettingRow>
@@ -620,10 +664,32 @@ export default class Setting extends React.PureComponent<
                       value={this.props.config.selectedColorRamp}
                       // onChange={this.onColorRampChange}
                     >
-                      {/* {this.state.availableColorRamps &&
-                        this.state.availableColorRamps.map((ramp) => (
-                          <Option value={ramp.name}>{ramp.name}</Option>
-                        ))} */}
+                      {/* <MenuItem value={sc.name} key={sc.id}>
+                        <PreviewRamp key={sc.name} colors={sc.colors}></PreviewRamp>
+                      </MenuItem> */}
+
+                      {this.props.config.availableColorRamps &&
+                        this.props.config.availableColorRamps.map((sc) => (
+                          <Option value={sc.name}>
+                            {sc.name}
+                            {/* <div style={{ display: 'flex' }}>
+                              {sc.colors &&
+                                sc.colors.map((color, i) => {
+                                  console.log(color);
+                                  return (
+                                    <div
+                                      key={`${color.id}-${i}`}
+                                      style={{
+                                        backgroundColor: color.toHex(),
+                                        height: 20,
+                                        width: 20
+                                      }}
+                                    ></div>
+                                  );
+                                })}
+                            </div> */}
+                          </Option>
+                        ))}
                     </Select>
                   </Label>
                 </SettingRow>
