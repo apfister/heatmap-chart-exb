@@ -109,8 +109,6 @@ export default class Widget extends React.PureComponent<
         }
       }
     };
-
-    // this.myRef = React.createRef();
   }
 
   componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>) {
@@ -136,7 +134,10 @@ export default class Widget extends React.PureComponent<
               ...prevState.chartOptions.plotOptions.heatmap,
               colorScale: {
                 ...prevState.chartOptions.plotOptions.heatmap.colorScale,
-                ranges: this.props.config.colorRanges
+                ranges: [
+                  ...[{ name: 'zero', from: 0, to: 0, color: '#919597' }],
+                  ...this.props.config.colorRanges
+                ]
               }
             }
           }

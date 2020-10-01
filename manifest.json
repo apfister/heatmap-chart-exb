@@ -9,6 +9,9 @@
   "dependency": [
     "jimu-arcgis"
   ],
+  "settingDependency": [
+    "jimu-arcgis"
+  ],
   "license": "http://www.apache.org/licenses/LICENSE-2.0",
   "properties": {},
   "translatedLocales": [

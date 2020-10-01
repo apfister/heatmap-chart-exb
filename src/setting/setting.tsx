@@ -6,7 +6,8 @@ import {
   IMDataSourceInfo,
   DataSource,
   DataSourceStatus,
-  DataSourceComponent
+  DataSourceComponent,
+  DataRecord
 } from 'jimu-core';
 import { AllWidgetSettingProps } from 'jimu-for-builder';
 import { ArcGISDataSourceTypes, loadArcGISJSAPIModules } from 'jimu-arcgis';
@@ -30,30 +31,20 @@ import {
 
 import { IMConfig } from '../config';
 
-// import FeatureLayer = require('esri/layers/FeatureLayer');
-// import colorRendererCreator = require('esri/smartMapping/renderers/color');
-// import colorSchemes = require('esri/smartMapping/symbology/color');
+import _ = require('lodash');
 
-// class PreviewRamp extends React.Component {
-//   render(props) {
-//     return (
-//       <div style={{ display: 'flex' }}>
-//         {this.props.colors.map((color, i) => {
-//           return (
-//             <div
-//               key={`${color.id}-${i}`}
-//               style={{ backgroundColor: color.toHex(), height: 20, width: 20 }}
-//             ></div>
-//           );
-//         })}
-//       </div>
-//     );
-//   }
-// }
+import FeatureLayer = require('esri/layers/FeatureLayer');
+import colorRendererCreator = require('esri/smartMapping/renderers/color');
+import colorSchemes = require('esri/smartMapping/symbology/color');
+import FeatureSet = require('esri/tasks/support/FeatureSet');
+import Query = require('esri/tasks/support/Query');
 
 interface IState {
-  query: any;
-  useWhereClause: boolean;
+  query: Query;
+  selectedDataSource: DataSource;
+  chartProps: Array<string>;
+  checkProps: Array<string>;
+  aggFeatureLayer: FeatureLayer;
 }
 export default class Setting extends React.PureComponent<
   AllWidgetSettingProps<IMConfig>,
@@ -61,20 +52,13 @@ export default class Setting extends React.PureComponent<
 > {
   supportedTypes = Immutable([ArcGISDataSourceTypes.FeatureLayer]);
   props: any;
-  // FeatureLayer: typeof __esri.FeatureLayer;
-  // colorRendererCreator: typeof __esri.smartMapping.renderers.color;
-  // colorSchemes: typeof __esri.smartMapping.symbology.color;
+  state: any;
 
   constructor(props) {
     super(props);
 
     this.state = {
-      apiLoaded: false,
-      selectedDataSource:
-        this.props &&
-        this.props.useDataSources &&
-        this.props.useDataSources.length > 0 &&
-        this.props.useDataSources[0],
+      selectedDataSource: null,
       checkProps: [
         'xAxisField',
         'yAxisField',
@@ -89,50 +73,9 @@ export default class Setting extends React.PureComponent<
         'selectedColorRamp'
       ],
       chartProps: ['useDataLabels'],
-      aggFeatureLayer: null
+      aggFeatureLayer: null,
+      query: null
     };
-
-    // if (!this.FeatureLayer) {
-    //   console.log('loading JS API modules...');
-    //   loadArcGISJSAPIModules([
-    //     'esri/layers/FeatureLayer',
-    //     'esri/smartMapping/renderers/color',
-    //     'esri/smartMapping/symbology/color'
-    //   ]).then((modules) => {
-    //     [
-    //       this.FeatureLayer,
-    //       this.colorRendererCreator,
-    //       this.colorSchemes
-    //     ] = modules;
-    //   });
-    // }
-  }
-
-  componentDidMount() {
-    if (!this.state.apiLoaded) {
-      console.log('loading JS API modules...');
-      loadArcGISJSAPIModules([
-        'esri/layers/FeatureLayer',
-        'esri/smartMapping/renderers/color',
-        'esri/smartMapping/symbology/color'
-      ]).then((modules) => {
-        [
-          this.FeatureLayer,
-          this.colorRendererCreator,
-          this.colorSchemes
-        ] = modules;
-        this.setState({ apiLoaded: true }, () => {
-          if (this.isDsConfigured()) {
-            this.query();
-          }
-        });
-      });
-    } else {
-      console.log('JS API modules loaded');
-      if (this.isDsConfigured()) {
-        this.query();
-      }
-    }
   }
 
   componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>) {
@@ -149,7 +92,8 @@ export default class Setting extends React.PureComponent<
         );
 
         // re-run query
-        this.query();
+        const query = this.getQueryObject();
+        this.setState({ query }, this.query);
         break;
       }
     }
@@ -195,7 +139,53 @@ export default class Setting extends React.PureComponent<
     return `${dte.getDate() + 1}-${dte.getMonth() + 1}-${dte.getFullYear()}`;
   }
 
-  transformFeaturesToSeries(
+  transformFeaturesToSeries(features) {
+    const dteField = this.props.config.xAxisField;
+    const groupByField = this.props.config.yAxisField;
+    let metricField = this.props.config.metricField;
+    if (this.props.config.useStats) {
+      metricField = `${this.props.config.statsType}_${this.props.config.metricField}`;
+    }
+
+    let allDates = [];
+
+    return (
+      _.chain(features)
+        // collect all the dates
+        .forEach((feature) => {
+          if (!allDates.includes(feature.attributes[dteField])) {
+            allDates.push(feature.attributes[dteField]);
+          }
+        })
+        .groupBy(`attributes.${groupByField}`)
+        .map((value, key) => {
+          const data = _.map(value, (feature) => {
+            return {
+              x: feature.attributes[dteField],
+              y: feature.attributes[metricField]
+            };
+          });
+          return { name: key, data };
+        })
+        .each((item) => {
+          const dtes = _.map(item.data, 'x');
+          const diff = _.difference(allDates, dtes);
+          _.each(diff, (dte) => {
+            item.data.push({
+              x: dte,
+              y: 0
+            });
+            item.data.sort((a, b) => {
+              const result = new Date(a.x) > new Date(b.x) ? 1 : -1;
+              return result;
+            });
+          });
+        })
+        .value()
+    );
+  }
+
+  transformFeaturesToSeries2(
     features,
     xAxisField,
     xAxisAgg,
@@ -262,11 +252,7 @@ export default class Setting extends React.PureComponent<
     });
   }
 
-  query = () => {
-    // if (!this.isDsConfigured()) {
-    //   return;
-    // }
-
+  getQueryObject = () => {
     console.log('query!!!');
 
     let where = '1=1';
@@ -317,9 +303,10 @@ export default class Setting extends React.PureComponent<
       }
     }
 
-    console.log('query', query);
+    // console.log('query', query);
 
-    this.setState({ query });
+    // this.setState({ query });
+    return query;
   };
 
   updateSeriesData = (seriesData: Array<any>) => {
@@ -328,88 +315,6 @@ export default class Setting extends React.PureComponent<
       config: this.props.config.set('seriesData', seriesData)
     };
     this.props.onSettingChange(config);
-  };
-
-  chartRender = (ds: DataSource, info: IMDataSourceInfo) => {
-    if (ds && ds.getStatus() === DataSourceStatus.Loaded) {
-      let records = ds.getRecords();
-      if (records.length === 0) {
-        this.updateSeriesData([]);
-        return null;
-      }
-
-      const features = this.convertRecordsToFeatures(records);
-      const formattedFields: Array<Object> = Object.keys(
-        records[0].feature.attributes
-      ).map((att) => {
-        return {
-          name: att,
-          alias: att,
-          type: this.convertEsriFieldTypeToFLCType(
-            records[0].feature.attributes[att]
-          )
-        };
-      });
-      formattedFields.push({ name: 'OBJECTID', type: 'oid' });
-
-      const xAxisAgg = `${this.props.config.statsType}_${this.props.config.metricField}`;
-
-      let yAxisFieldLabel = this.props.config.yAxisField;
-
-      const seriesData = this.transformFeaturesToSeries(
-        features,
-        this.props.config.xAxisField,
-        xAxisAgg,
-        this.props.config.yAxisField,
-        yAxisFieldLabel
-      );
-
-      seriesData.sort((a, b) => b.name.localeCompare(a.name));
-      // console.log(seriesData);
-
-      this.updateSeriesData(seriesData);
-
-      // reset renderer
-      const url = `${ds.layer.url}/${ds.layer.layerId}`;
-      const fl = new this.FeatureLayer({ url });
-      console.log('feature layer!', url);
-
-      fl.queryFeatures(this.state.query).then((response) => {
-        response.features.forEach((feature, i) => {
-          feature.attributes['OBJECTID'] = i + 1;
-        });
-        response.fields.push({ name: 'OBJECTID', type: 'oid' });
-
-        const createdFL = new this.FeatureLayer({
-          source: response.features,
-          fields: response.fields,
-          spatialReference: 4326,
-          objectIdField: 'OBJECTID',
-          geometryType: response.geometryType
-        });
-
-        const schemes = this.colorSchemes
-          .getSchemesByTag({
-            geometryType: response.geometryType,
-            theme: 'high-to-low',
-            includedTags: ['sequential', 'oranges', 'reds']
-          })
-          .sort((a, b) => {
-            return a.name < b.name ? 1 : -1;
-          });
-
-        const config = {
-          id: this.props.id,
-          config: this.props.config.set('availableColorRamps', schemes)
-        };
-        this.props.onSettingChange(config);
-
-        this.updateRenderer(createdFL);
-      });
-
-      return null;
-    }
-    return null;
   };
 
   getColorScheme(csName) {
@@ -434,32 +339,135 @@ export default class Setting extends React.PureComponent<
       );
     }
 
-    this.colorRendererCreator
-      .createClassBreaksRenderer(params)
-      .then((response) => {
-        const cbInfos = response.renderer.classBreakInfos;
+    colorRendererCreator.createClassBreaksRenderer(params).then((response) => {
+      const cbInfos = response.renderer.classBreakInfos;
 
-        let colors = cbInfos.map((i) => i.symbol.color.toHex());
-        // if (this.state.flipColors) {
-        //   colors = colors.reverse();
-        // }
-        const colorRanges = cbInfos.map((info, i) => ({
-          name: info.label,
-          from: info.minValue,
-          to: info.maxValue,
-          color: colors[i]
-        }));
+      let colors = cbInfos.map((i) => i.symbol.color.toHex());
+      // if (this.state.flipColors) {
+      //   colors = colors.reverse();
+      // }
+      const colorRanges = cbInfos.map((info, i) => ({
+        name: info.label,
+        from: info.minValue,
+        to: info.maxValue,
+        color: colors[i]
+      }));
+
+      const config = {
+        id: this.props.id,
+        config: this.props.config.set('colorRanges', colorRanges)
+      };
+      this.props.onSettingChange(config);
+    });
+  }
+
+  query = () => {
+    console.log('query', '===> querying for data ..');
+    if (
+      this.state.selectedDataSource &&
+      this.state.selectedDataSource.getStatus() === DataSourceStatus.Loaded
+    ) {
+      let records: DataRecord[] = this.state.selectedDataSource.getRecords();
+      if (records.length === 0) {
+        this.updateSeriesData([]);
+        return;
+      }
+
+      const features = this.convertRecordsToFeatures(records);
+      const formattedFields: Array<Object> = Object.keys(
+        records[0].feature.attributes
+      ).map((att) => {
+        return {
+          name: att,
+          alias: att,
+          type: this.convertEsriFieldTypeToFLCType(
+            records[0].feature.attributes[att]
+          )
+        };
+      });
+      formattedFields.push({ name: 'OBJECTID', type: 'oid' });
+
+      // const xAxisAgg = `${this.props.config.statsType}_${this.props.config.metricField}`;
+      // let yAxisFieldLabel = this.props.config.yAxisField;
+
+      // const seriesData = this.transformFeaturesToSeries(
+      //   features,
+      //   this.props.config.xAxisField,
+      //   xAxisAgg,
+      //   this.props.config.yAxisField,
+      //   yAxisFieldLabel
+      // );
+
+      const seriesData = this.transformFeaturesToSeries(features);
+
+      seriesData.sort((a, b) => b.name.localeCompare(a.name));
+      // console.log(seriesData);
+
+      this.updateSeriesData(seriesData);
+
+      // reset renderer
+      const url = `${this.state.selectedDataSource.layer.url}/${this.state.selectedDataSource.layer.layerId}`;
+      const fl = new FeatureLayer({ url });
+      console.log('feature layer!', url);
+
+      fl.queryFeatures(this.state.query).then((response: FeatureSet) => {
+        response.features.forEach((feature, i) => {
+          feature.attributes['OBJECTID'] = i + 1;
+        });
+        response.fields.push({ name: 'OBJECTID', type: 'oid', alias: 'oid' });
+
+        const createdFL = new FeatureLayer({
+          source: response.features,
+          fields: response.fields,
+          spatialReference: { wkid: 4326 },
+          objectIdField: 'OBJECTID',
+          geometryType: response.geometryType
+        });
+
+        const schemes = colorSchemes
+          .getSchemesByTag({
+            geometryType: response.geometryType,
+            theme: 'high-to-low',
+            includedTags: ['sequential', 'oranges', 'reds']
+          })
+          .sort((a, b) => {
+            return a.name < b.name ? 1 : -1;
+          });
 
         const config = {
           id: this.props.id,
-          config: this.props.config.set('colorRanges', colorRanges)
+          config: this.props.config.set('availableColorRamps', schemes)
         };
         this.props.onSettingChange(config);
+
+        this.updateRenderer(createdFL);
       });
-  }
+    }
+  };
 
   handleDataSourceCreated = (ds: DataSource) => {
-    this.setState({ selectedDataSource: ds });
+    console.log('handleDataSourceCreated :: ds created');
+    if (!this.state.selectedDataSource) {
+      this.setState(
+        {
+          selectedDataSource: ds
+        },
+        () => {
+          if (this.isDsConfigured()) {
+            const query = this.getQueryObject();
+            this.setState({ query: query }, this.query);
+          }
+        }
+      );
+    }
+  };
+
+  handleDataSourceInfoChange = (info: IMDataSourceInfo) => {
+    if (info.status === DataSourceStatus.Loaded && this.isDsConfigured()) {
+      console.log('handleDataSourceInfoChange :: ds loaded. querying..', info);
+      const query = this.getQueryObject();
+      this.setState({ query }, this.query);
+    }
   };
 
   render() {
@@ -662,32 +670,32 @@ export default class Setting extends React.PureComponent<
                     Color Ramp
                     <Select
                       value={this.props.config.selectedColorRamp}
-                      // onChange={this.onColorRampChange}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        this.onPropChange(
+                          'selectedColorRamp',
+                          event.target.value
+                        )
+                      }
                     >
-                      {/* <MenuItem value={sc.name} key={sc.id}>
-                        <PreviewRamp key={sc.name} colors={sc.colors}></PreviewRamp>
-                      </MenuItem> */}
-
                       {this.props.config.availableColorRamps &&
                         this.props.config.availableColorRamps.map((sc) => (
                           <Option value={sc.name}>
-                            {sc.name}
-                            {/* <div style={{ display: 'flex' }}>
+                            {/* {sc.name} */}
+                            <div style={{ display: 'flex' }}>
                               {sc.colors &&
                                 sc.colors.map((color, i) => {
-                                  console.log(color);
                                   return (
                                     <div
                                       key={`${color.id}-${i}`}
                                       style={{
-                                        backgroundColor: color.toHex(),
+                                        backgroundColor: `rgb(${color.r},${color.g}, ${color.b})`,
                                         height: 20,
                                         width: 20
                                       }}
                                     ></div>
                                   );
                                 })}
-                            </div> */}
+                            </div>
                           </Option>
                         ))}
                     </Select>
@@ -712,13 +720,11 @@ export default class Setting extends React.PureComponent<
               </SettingSection>
               <DataSourceComponent
                 useDataSource={this.props.useDataSources[0]}
-                query={this.state.query && this.state.query}
+                query={this.state && this.state.query}
                 widgetId={this.props.id}
-                queryCount
                 onDataSourceCreated={this.handleDataSourceCreated}
-              >
-                {this.chartRender}
-              </DataSourceComponent>
+                onDataSourceInfoChange={this.handleDataSourceInfoChange}
+              ></DataSourceComponent>
             </>
           )}
       </div>
