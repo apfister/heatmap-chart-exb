@@ -2,6 +2,7 @@ import {
   React,
   Immutable,
   IMFieldSchema,
+  IMSqlExpression,
   UseDataSource,
   IMDataSourceInfo,
   DataSource,
@@ -10,7 +11,7 @@ import {
   DataRecord
 } from 'jimu-core';
 import { AllWidgetSettingProps } from 'jimu-for-builder';
-import { ArcGISDataSourceTypes, loadArcGISJSAPIModules } from 'jimu-arcgis';
+import { ArcGISDataSourceTypes } from 'jimu-arcgis';
 import {
   DataSourceSelector,
   FieldSelector
@@ -21,6 +22,12 @@ import {
 } from 'jimu-ui/advanced/setting-components';
 
 import {
+  SqlExpressionBuilder,
+  SqlExpressionBuilderPopup
+} from 'jimu-ui/advanced/sql-expression-builder';
+
+import {
+  Button,
   Switch,
   Label,
   Select,
@@ -38,6 +45,7 @@ import colorRendererCreator = require('esri/smartMapping/renderers/color');
 import colorSchemes = require('esri/smartMapping/symbology/color');
 import FeatureSet = require('esri/tasks/support/FeatureSet');
 import Query = require('esri/tasks/support/Query');
+import { ColorPicker } from 'jimu-ui/basic/color-picker';
 
 interface IState {
   query: Query;
@@ -45,6 +53,7 @@ interface IState {
   chartProps: Array<string>;
   checkProps: Array<string>;
   aggFeatureLayer: FeatureLayer;
+  isExpBuilderOpen: boolean;
 }
 export default class Setting extends React.PureComponent<
   AllWidgetSettingProps<IMConfig>,
@@ -59,18 +68,23 @@ export default class Setting extends React.PureComponent<
 
     this.state = {
       selectedDataSource: null,
+      isExpBuilderOpen: false,
       checkProps: [
         'xAxisField',
         'yAxisField',
         'metricField',
         'useStats',
         'statsType',
-        'useWhereClause',
-        'whereClause',
+        'useExpression',
+        'expression',
         'useYAxisFieldLabel',
         'yAxisFieldLabel',
         'numClasses',
-        'selectedColorRamp'
+        'selectedColorRamp',
+        'shouldFlipColorRamp',
+        'noDataLabel',
+        'noDataColor',
+        'dataLabelForeColor'
       ],
       chartProps: ['useDataLabels'],
       aggFeatureLayer: null,
@@ -256,8 +270,12 @@ export default class Setting extends React.PureComponent<
     console.log('query!!!');
 
     let where = '1=1';
-    if (this.props.config.useWhereClause) {
-      where = this.props.config.whereClause;
+    if (
+      this.props.config.useExpression &&
+      this.props.config.expression &&
+      this.props.config.expression.sql
+    ) {
+      where = this.props.config.expression.sql;
     }
 
     const orderByFields = [`${this.props.config.yAxisField} ASC`];
@@ -343,13 +361,14 @@ export default class Setting extends React.PureComponent<
       const cbInfos = response.renderer.classBreakInfos;
 
       let colors = cbInfos.map((i) => i.symbol.color.toHex());
-      // if (this.state.flipColors) {
-      //   colors = colors.reverse();
-      // }
+      if (this.props.config.shouldFlipColorRamp) {
+        colors = colors.reverse();
+      }
       const colorRanges = cbInfos.map((info, i) => ({
         name: info.label,
         from: info.minValue,
         to: info.maxValue,
+        foreColor: this.props.config.dataLabelForeColor,
         color: colors[i]
       }));
 
@@ -501,7 +520,7 @@ export default class Setting extends React.PureComponent<
           this.props.useDataSources.length > 0 && (
             <>
               {/* Chart Title */}
-              <SettingSection title="Chart Title">
+              {/* <SettingSection title="Chart Title">
                 <SettingRow>
                   <TextInput
                     value={this.props.config.chartTitle}
@@ -510,34 +529,46 @@ export default class Setting extends React.PureComponent<
                     }
                   />
                 </SettingRow>
-              </SettingSection>
+              </SettingSection> */}
 
               {/* Where Clause */}
-              <SettingSection title="Subset Data">
+              <SettingSection title="Filter Data">
                 <Label className="mt-4 w-75 d-inline-block font-dark-600">
-                  Use Where Clause
+                  Use Expression
                   <Switch
                     aria-label="test"
                     className="ml-2"
-                    checked={this.props.config.useWhereClause}
+                    checked={this.props.config.useExpression}
                     onChange={(
                       event: React.ChangeEvent<HTMLInputElement>,
                       checked: boolean
-                    ) => this.onPropChange('useWhereClause', checked)}
+                    ) => this.onPropChange('useExpression', checked)}
                   />
                 </Label>
-                {!!this.props.config.useWhereClause && (
+                {!!this.props.config.useExpression && (
                   <SettingRow>
-                    <Label className="w-75 d-inline-block font-dark-600">
-                      Where Clause
-                      <TextInput
-                        placeholder="1=1"
-                        value={this.props.config.whereClause}
-                        onAcceptValue={(value: string) =>
-                          this.onPropChange('whereClause', value)
+                    <Button
+                      type="primary"
+                      size="sm"
+                      onClick={() => {
+                        this.setState({ isExpBuilderOpen: true });
+                      }}
+                    >
+                      Set Filter Expressions
+                    </Button>
+                    <SqlExpressionBuilderPopup
+                      dataSource={this.state.selectedDataSource}
+                      expression={this.props.config.expression}
+                      isOpen={this.state.isExpBuilderOpen}
+                      toggle={(isOpen: boolean) => {
+                        this.setState({ isExpBuilderOpen: false });
+                      }}
+                      onChange={(expression: IMSqlExpression) => {
+                        if (expression.sql !== '') {
+                          this.onPropChange('expression', expression);
                         }
-                      />
-                    </Label>
+                      }}
+                    />
                   </SettingRow>
                 )}
               </SettingSection>
@@ -605,7 +636,7 @@ export default class Setting extends React.PureComponent<
                     }
                   />
                 </SettingRow>
-                <Label className="mt-4 w-75 d-inline-block font-dark-600">
+                {/* <Label className="mt-4 w-75 d-inline-block font-dark-600">
                   Y-Axis Field for Label
                   <Switch
                     aria-label="test"
@@ -616,7 +647,7 @@ export default class Setting extends React.PureComponent<
                       checked: boolean
                     ) => this.onPropChange('useYAxisFieldLabel', checked)}
                   />
-                </Label>
+                </Label> */}
 
                 {!!this.props.config.useYAxisFieldLabel && (
                   <SettingRow>
@@ -680,7 +711,6 @@ export default class Setting extends React.PureComponent<
                       {this.props.config.availableColorRamps &&
                         this.props.config.availableColorRamps.map((sc) => (
                           <Option value={sc.name}>
-                            {/* {sc.name} */}
                             <div style={{ display: 'flex' }}>
                               {sc.colors &&
                                 sc.colors.map((color, i) => {
@@ -703,6 +733,22 @@ export default class Setting extends React.PureComponent<
                 </SettingRow>
                 <SettingRow>
                   <Label className="mt-4 w-75 d-inline-block font-dark-600">
+                    Flip Color Ramp
+                    <Switch
+                      aria-label="test"
+                      className="ml-2"
+                      checked={this.props.config.shouldFlipColorRamp}
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>,
+                        checked: boolean
+                      ) => {
+                        this.onPropChange('shouldFlipColorRamp', checked);
+                      }}
+                    />
+                  </Label>
+                </SettingRow>
+                <SettingRow>
+                  <Label className="mt-4 w-75 d-inline-block font-dark-600">
                     Use Data Labels
                     <Switch
                       aria-label="test"
@@ -713,6 +759,49 @@ export default class Setting extends React.PureComponent<
                         checked: boolean
                       ) => {
                         this.onPropChange('useDataLabels', checked);
+                      }}
+                    />
+                  </Label>
+                </SettingRow>
+                {!!this.props.config.useDataLabels && (
+                  <SettingRow>
+                    <Label className="w-75 d-inline-block font-dark-600">
+                      Data Label Color
+                      <ColorPicker
+                        color={this.props.config.dataLabelForeColor}
+                        showArrow={false}
+                        placement="auto"
+                        onChange={(color: string) => {
+                          this.onPropChange('dataLabelForeColor', color);
+                        }}
+                      />
+                    </Label>
+                  </SettingRow>
+                )}
+                <SettingRow>
+                  <Label className="w-75 d-inline-block font-dark-600">
+                    No Data Label
+                    <TextInput
+                      value={this.props.config.noDataLabel}
+                      onAcceptValue={(value: string) =>
+                        this.onPropChange('noDataLabel', value)
+                      }
+                    />
+                  </Label>
+                </SettingRow>
+                <SettingRow>
+                  <Label className="w-75 d-inline-block font-dark-600">
+                    No Data Color
+                    <ColorPicker
+                      color={this.props.config.noDataColor}
+                      // width={width}
+                      // height={height}
+                      showArrow={false}
+                      placement="auto"
+                      // presetColors={presetColors}
+                      // disableAlpha={disableAlpha}
+                      onChange={(color: string) => {
+                        this.onPropChange('noDataColor', color);
                       }}
                     />
                   </Label>

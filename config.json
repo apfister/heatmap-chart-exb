@@ -6,14 +6,18 @@
   "metricField": "",
   "useStats": false,
   "statsType": "",
-  "useWhereClause": false,
-  "whereClause": "",
+  "useExpression": false,
+  "expression": null,
   "numClasses": 6,
   "selectedColorRamp": "Orange 3",
+  "shouldFlipColorRamp": false,
   "availableColorRamps": [],
   "chartOptions": {},
   "seriesData": [],
   "chartTitle": "",
   "useDataLabels": false,
-  "colorRanges": []
+  "dataLabelForeColor": "#000000",
+  "colorRanges": [],
+  "noDataLabel": "No Data",
+  "noDataColor": "#f5fafb"
 }
